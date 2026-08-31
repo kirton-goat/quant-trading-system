@@ -1,0 +1,25 @@
+{
+  "backtest_version": "v1_historical_point_in_time",
+  "universe": "CSI300_CSI500",
+  "start_date": "2020-01-01",
+  "end_date": "2025-12-31",
+  "top_n": 20,
+  "holding_days": 20,
+  "rebalance_days": 20,
+  "initial_capital": 1000000.0,
+  "fee_rate": 0.0015,
+  "slippage_rate": 0.0,
+  "market_min_score": 40.0,
+  "factor_weights": {
+    "market_regime": 0.20,
+    "momentum": 0.25,
+    "money_flow": 0.20,
+    "fundamental": 0.25,
+    "technical": 0.10
+  },
+  "model_b_event_boost_max": 0.05,
+  "benchmark_symbols": {
+    "CSI300": "sh000300",
+    "CSI500": "sh000905"
+  }
+}

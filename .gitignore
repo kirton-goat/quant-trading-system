@@ -1,0 +1,86 @@
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Python / test artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+test_tmp_pit/
+
+# Local data, cached vendor data, logs, and generated research output
+data_cache/
+logs/
+*.log
+future_data_check.log
+fundamental_future_data_check.log
+research/experiments/output/
+research/experiments/registry/experiments.jsonl
+research/data_integrity/*.csv
+research/data_integrity/price_gap_resolution_plan.md
+research/audits/
+
+# Generated backtest results and local reports
+AI_INSTRUCTIONS.md
+PROJECT_CONTEXT.md
+CHANGELOG.md
+dashboard_design.md
+strategy_diagnosis.md
+information_source_report.md
+backtest_equity_curve*.csv
+backtest_v*_equity_curve*.csv
+backtest_trades*.csv
+backtest_v*_summary.json
+backtest_integrity_report.md
+backtest_v2_integrity_report.md
+backtest_report.md
+benchmark_comparison.md
+portfolio_backtest_report.md
+factor_research_report.md
+fundamental_current_status.md
+fundamental_data_quality_report.md
+historical_universe_report.md
+historical_universe_smoke_report.md
+architecture_adjustment_smoke_report.md
+information_source_report.md
+sector_rank.md
+research/backtest*_audit*.csv
+research/backtest*_report*.md
+research/v1_v2_comparison.md
+research/research_platform_current_audit.md
+research/corporate_action_price_audit.md
+research/experiments/market_regime_attribution/*.csv
+research/experiments/market_regime_attribution/*.json
+research/experiments/market_regime_attribution/*.md
+research/v3/v3_baseline_report.md
+
+# Frontend dependencies and builds
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+dashboard/frontend/.vite/
+
+# Local-only Windows launch helpers and desktop artifacts
+*.bat
+*.lnk
+Thumbs.db
+Desktop.ini
+
+# Local process/editor files
+*.pid
+*.lock
+.DS_Store

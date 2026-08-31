@@ -1,0 +1,31 @@
+{
+  "research_version": "v4_entry_timing_candidate",
+  "result_classification": "research_experiment",
+  "research_state": "in_sample_research",
+  "sample_period": {
+    "start": "2015-01-01",
+    "end": "2025-12-31"
+  },
+  "universe": "CSI300_CSI500",
+  "top_n": 20,
+  "holding_days": 20,
+  "rebalance_days": 20,
+  "initial_capital": 1000000,
+  "fee_rate": 0.0015,
+  "slippage_rate": 0.0,
+  "market_min_score": 40.0,
+  "factor_weights": {
+    "market_regime": 0.2,
+    "momentum": 0.25,
+    "money_flow": 0.2,
+    "fundamental": 0.25,
+    "technical": 0.1
+  },
+  "market_regime_gate": true,
+  "technical_variant": "entry_timing",
+  "benchmark_setup": {
+    "CSI300": "sh000300",
+    "CSI500": "sh000905",
+    "combined": "undefined"
+  }
+}

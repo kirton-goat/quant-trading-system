@@ -1,0 +1,10 @@
+akshare
+pandas
+numpy
+openai
+requests
+fastapi
+pydantic
+uvicorn[standard]
+baostock
+pytest
