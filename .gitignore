@@ -73,6 +73,9 @@ research/v3/v3_baseline_report.md
 dashboard/frontend/node_modules/
 dashboard/frontend/dist/
 dashboard/frontend/.vite/
+demo/node_modules/
+demo/dist/
+demo/.vite/
 
 # Local-only Windows launch helpers and desktop artifacts
 *.bat
