@@ -1,153 +1,169 @@
-# AI Quant Research Platform
+# AI 量化研究平台
 
-> A local-first, research-only A-share quantitative research platform for testing portfolio hypotheses with historical point-in-time controls. It does **not** place orders or connect to a live brokerage.
+[中文](README.md) | [English](README_EN.md)
+
+> 面向 A 股的本地优先量化研究平台：围绕历史股票池、历史时点基本面与组合回测构建可审计的策略研究流程。项目不接入券商、不自动下单，仅用于研究与模拟验证。
 
 ![AI Quant Research logo](assets/ai-quant-logo.png)
 
-## Project Overview
+## 项目定位
 
-This project evolved from an AI-assisted news-analysis prototype into a modular quantitative research platform. Its focus is not “news-driven stock recommendations”, but building a more auditable workflow for:
+这是一个从“新闻辅助分析原型”逐步演进而来的量化研究项目。当前核心目标不是生成新闻驱动的买卖推荐，而是搭建一套能回答以下问题的研究基础设施：
 
-1. constructing a historically valid A-share universe;
-2. calculating market, momentum, money-flow, fundamental, and entry-timing signals;
-3. applying point-in-time data rules and eligibility filters;
-4. forming and replaying portfolios under fixed rebalancing rules; and
-5. comparing strategy variants, factor experiments, risk metrics, and integrity checks in a web dashboard.
+1. 在当时真实存在且可交易的股票范围内，某类因子是否有横截面选股信息？
+2. 在不使用未来财报、未来指数成分和虚构价格的前提下，组合回测表现如何？
+3. 市场环境、动量、量价、基本面与入场位置因子分别带来了什么贡献和风险？
+4. 策略版本、实验配方、数据质量和回测限制能否被清晰追溯？
 
-The implementation was developed iteratively with AI-assisted coding and review. The research design, constraints, validation goals, and interpretation remain human-directed. Results are research artifacts, not investment advice or evidence of future returns.
+项目采用 Python 研究引擎与 FastAPI / React 展示层解耦的结构，适合作为量化研究、数据工程和后端/全栈工程方向的项目作品。
 
-## Research Architecture
+## 核心能力
+
+- **历史股票池管理**：按每个调仓日获取沪深 300 / 中证 500 的历史成分，而非用当前成分股回测过去。
+- **可交易性过滤**：排除上市时间不足、ST、退市、长期停牌及流动性不足的股票。
+- **PIT 基本面**：财报仅在实际披露后生效，严格执行 `disclosure_date <= signal_date`。
+- **多因子研究**：市场环境、动量、量价、基本面、Entry Timing（入场位置）五类因子；支持单因子 Top5 / Top10 / Top20、IC、Rank IC 和分组收益研究。
+- **连续调仓回测**：按“信号日 T 计算、下一交易日执行”的时间轴进行组合换仓，避免持仓期与调仓期叠加造成非预期现金空档。
+- **回测完整性审计**：检查历史股票池、未来数据、基本面可见性、价格生命周期、流动性与公司行动连续性。
+- **研究看板**：通过 FastAPI JSON API 向 React / ECharts Dashboard 提供版本信息、因子结果、回测指标和审计状态。
+
+## 系统架构
 
 ```text
-Historical CSI300 / CSI500 constituents
-        |
-        v
-Eligibility filters
-  - listing age
-  - ST / delisting / suspension
-  - liquidity
-        |
-        v
-Historical prices + point-in-time fundamentals
-        |
-        v
-Factor panel
-  Market | Momentum | Money Flow | Fundamental | Entry Timing
-        |
-        v
-Cross-sectional ranking and Top N portfolio
-        |
-        v
-Continuous-rebalance backtest + integrity checks
-        |
-        v
-FastAPI -> React / ECharts research dashboard
+沪深300 / 中证500历史成分
+            |
+            v
+可交易性过滤
+  上市时间 | ST | 停牌 | 退市 | 流动性
+            |
+            v
+历史行情 + 历史时点基本面（PIT）
+            |
+            v
+因子面板
+  市场环境 | 动量 | 量价 | 基本面 | 入场位置
+            |
+            v
+横截面排序 + Top N 组合
+            |
+            v
+连续调仓回测 + 完整性检查
+            |
+            v
+FastAPI API -> React / ECharts 研究看板
 ```
 
-## Historical Data Integrity
+## 如何控制常见回测偏差
 
-The project includes explicit controls intended to reduce common backtest biases:
+### 历史股票池与幸存者偏差
 
-- **Historical universe:** each rebalance uses the CSI300 / CSI500 constituents available on that historical date, instead of today’s index members.
-- **Eligibility filtering:** filters new listings, ST securities, delisted securities, long suspensions, and insufficient-liquidity candidates.
-- **Point-in-time fundamentals:** a financial report is visible only when `disclosure_date <= signal_date`; the latest currently known financial statement is never used to score an earlier date.
-- **No future membership:** a security cannot be introduced before its historical membership or listing date.
-- **Price lifecycle audit:** prices are expected only through a security’s actual trading life. Post-delisting non-trading days are not fabricated as prices or misclassified as ordinary data gaps.
-- **Execution timing:** the continuous-rebalance engine generates a signal at `T` and executes on the next trading day using the configured convention.
+回测不是直接读取今天的股票或指数名单。每一个调仓日都会读取当时的 CSI300 / CSI500 成分，并结合证券上市、退市状态筛选候选股票。这样可以降低“只用今天仍存续的股票回测过去”造成的幸存者偏差。
 
-These checks reduce, but do not eliminate, survivorship bias, data-revision risk, delisting-event handling complexity, vendor-data limitations, and all forms of model overfitting.
+### PIT 基本面与未来函数
 
-## Strategy Research
+基本面数据区分：
 
-The platform separates a common market-state signal from cross-sectional stock-selection signals:
+- `report_period`：财报归属期；
+- `disclosure_date`：财报实际披露日；
+- `signal_date`：策略计算信号的日期。
 
-| Component | Role |
-| --- | --- |
-| Market regime | Time-series market state and optional exposure gate; it is common to all stocks on the same date. |
-| Momentum | Medium-term trend strength. |
-| Money flow | Volume / turnover confirmation. |
-| Fundamental | Profitability, growth, cash-flow, and valuation components using PIT data. |
-| Entry timing | Short-term entry-quality / overheat assessment; separated from medium-term momentum. |
+只有 `disclosure_date <= signal_date` 的财报可以进入因子计算。例如，2023 年年报即使报告期为 2023-12-31，在披露日之前也不会被用于 2024 年初的回测。
 
-Research modules include single-factor validation, Top5 / Top10 / Top20 comparisons, IC / Rank IC analysis, factor recipes, historical portfolio replay, Market Regime ablation, and V1/V2 timeline comparison.
+### 价格生命周期
 
-## Backtest Baselines
+历史价格审计不会要求退市后的股票继续有报价，也不会以插值、前值填充或虚构收益替代真实价格。当前生命周期审计将旧固定窗口标记的 18 条边界记录重新分类为：13 条正常终止交易、5 条正常上市起点，真实可交易期间价格缺口为 0。
 
-### V2 Continuous Rebalance (validated historical baseline)
+上述控制可以降低偏差，但并不能完全消除数据修订、公司行动还原、供应商覆盖度和模型选择偏差等研究风险。
 
-| Item | Value |
+## 因子与研究方式
+
+| 因子 | 类型 | 主要作用 |
+| --- | --- | --- |
+| Market Regime | 时间序列市场状态 | 衡量市场状态，并可作为独立的仓位开关研究对象；同一日对所有股票相同。 |
+| Momentum | 横截面选股因子 | 衡量中期趋势强度。 |
+| Money Flow | 横截面选股因子 | 通过成交量、成交额等量价信息确认资金活跃度。 |
+| Fundamental | 横截面选股因子 | 使用 PIT 财务数据评估盈利、成长、现金流和估值。 |
+| Entry Timing | 横截面选股因子 | 关注短期偏离、追涨风险、RSI、MACD 边际变化、波动和跳空等入场位置。 |
+
+其中 Market Regime 是共同市场状态，不能被误当作普通 TopN 个股排序因子；其余四类因子可在单因子研究中比较 Top5 / Top10 / Top20、IC、Rank IC 与五分位收益。
+
+## 回测基线
+
+### V2 Continuous Rebalance
+
+| 项目 | 数值 |
 | --- | ---: |
-| Period | 2020-01-01 to 2025-12-31 |
-| Universe | Historical CSI300 + CSI500 constituents |
-| Portfolio | Top 20, rebalance every 20 trading days |
-| Initial capital | RMB 1,000,000 |
-| Fee assumption | 0.15% |
-| Total return | 76.66% |
-| CAGR | 10.36% |
-| Annualized volatility | 24.25% |
-| Maximum drawdown | -41.21% |
-| Sharpe ratio | 0.53 |
-| Average exposure | 81.99% |
+| 回测区间 | 2020-01-01 至 2025-12-31 |
+| 股票池 | 历史 CSI300 + CSI500 成分股 |
+| 持仓规则 | Top 20，每 20 个交易日调仓 |
+| 初始资金 | 1,000,000 元 |
+| 手续费假设 | 0.15% |
+| 累计收益 | 76.66% |
+| 年化收益（CAGR） | 10.36% |
+| 年化波动率 | 24.25% |
+| 最大回撤 | -41.21% |
+| Sharpe Ratio | 0.53 |
+| 平均仓位 | 81.99% |
 
-The metrics above describe one frozen historical configuration. They are **not** optimized claims, live performance, or a recommendation to trade. The research platform intentionally retains less successful candidate experiments as evidence of the validation process.
+这是一个冻结的历史研究配置，不是调参后挑选出的“最优策略”，更不代表实盘收益预测。项目保留表现较弱的候选实验与消融实验，用于呈现研究验证过程而非只展示正向结果。
 
-### Version Boundary
+### 版本边界
 
-- **V1 Historical PIT:** frozen reference; retained with a documented rebalancing-timeline limitation.
-- **V2 Continuous Rebalance:** current validated historical baseline.
-- **V3 / V4:** long-sample and single-factor research environments; not promoted as production strategies.
+- **V1 Historical PIT**：冻结参考版本，保留并记录了早期调仓时间轴的问题。
+- **V2 Continuous Rebalance**：当前已验证的历史回测基线。
+- **V3 / V4**：长样本、单因子与策略配方研究环境，属于研究结果，不升级为正式策略。
 
-## Web Dashboard
+## 研究看板
 
-The Dashboard is a display and research layer, separated from Python research modules through FastAPI JSON endpoints.
+Dashboard 是独立的展示层，前端不直接读取 CSV，也不绑定 Python 内部类结构。
 
-- **Overview:** cached market status, version boundaries, portfolio metrics, and cross-sectional ranking.
-- **Factor analysis:** current factor score display and factor explanations.
-- **Backtest analysis:** curves and historical metrics for validated baselines.
-- **Strategy Explorer:** code-audited metadata on universe, factor roles, weights, timing, risk filters, and known limitations.
-- **V4 single-factor validation:** independent factor recipes and TopN / IC research records.
+- 总览：版本边界、缓存市场状态、组合指标和当前横截面排序；
+- 多因子分析：因子评分与解释；
+- 回测分析：已验证基线的净值与风险指标；
+- 策略说明中心：从后端结构化元数据读取股票池、因子角色、权重、调仓、费用、风控和已知限制；
+- V4 单因子验证：记录配方、TopN、IC / Rank IC、分组收益与实验状态。
 
-Screenshots and generated research artifacts are intentionally not committed because they can be large and local-data dependent. For a local preview, start the API and frontend, then open `http://127.0.0.1:5173/`.
+本仓库不提交本地缓存和完整实验数据，因此界面截图及生成的回测产物不作为代码仓库文件提供。完整开发环境中启动服务后，可访问 `http://127.0.0.1:5173/` 查看本地看板。
 
-## Technology Stack
+## 技术栈
 
-- Python, Pandas, BaoStock, AKShare
-- FastAPI / Uvicorn
-- React, Vite, ECharts
-- CSV-based local research cache with explicit cache provenance
-- Pytest
+- **数据与研究**：Python、Pandas、NumPy、BaoStock、AKShare
+- **服务层**：FastAPI、Uvicorn、Pydantic
+- **前端**：React、Vite、ECharts
+- **本地数据管理**：带来源与时间边界说明的 CSV 缓存
+- **测试**：Pytest
 
-## Repository Layout
+## 项目结构
 
 ```text
 .
-├── dashboard/                 # FastAPI API and React / ECharts dashboard
+├── dashboard/                 # FastAPI API 与 React / ECharts 看板
 ├── research/
-│   ├── universe/              # Historical index members and eligibility filters
-│   ├── fundamentals/          # Point-in-time financial statement access
-│   ├── v3/                    # Long-sample research infrastructure
-│   ├── v4/                    # Five-factor and single-factor research workspace
-│   ├── experiments/           # Experiment runners (generated outputs ignored)
-│   └── audits/                # Strategy/data logic audit documents
-├── tests/                     # Automated integrity and research tests
-├── assets/                    # Public logo assets
-├── factor_engine.py           # Factor score orchestration
-├── market_data_manager.py     # Historical market-data cache interface
-├── universe_manager.py        # Universe management interface
+│   ├── universe/              # 历史成分股与可交易性过滤
+│   ├── fundamentals/          # 历史时点基本面数据访问
+│   ├── v3/                    # 长样本研究基础设施
+│   ├── v4/                    # 五因子与单因子研究工作台
+│   ├── experiments/           # 实验运行器（生成结果不提交）
+│   └── data_integrity/        # 数据质量与价格生命周期审计
+├── tests/                     # 自动化测试
+├── assets/                    # 可公开展示的 Logo 资源
+├── factor_engine.py           # 因子评分编排
+├── market_data_manager.py     # 历史行情缓存接口
+├── universe_manager.py        # 股票池管理接口
 ├── backtest_config_v*.{yaml,json}
 └── requirements.txt
 ```
 
-## Local Setup
+## 本地运行
 
-### Python API
+### 启动 API
 
 ```bash
 pip install -r requirements.txt
 python -m uvicorn dashboard.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-### Dashboard
+### 启动前端
 
 ```bash
 cd dashboard/frontend
@@ -155,32 +171,28 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173/` after both services are running.
+随后访问 `http://127.0.0.1:5173/`。
 
-## Optional Local Integrations
-
-The original prototype can optionally use an LLM for research-oriented news parsing and PushPlus for local notifications. These integrations are intentionally configured through environment variables and are not required for historical backtests or dashboard display.
-
-```bash
-# Optional: keep real values local. Do not commit a .env file.
-DEEPSEEK_API_KEY=your_local_key
-PUSHPLUS_TOKEN=your_local_token
-```
-
-## Tests
+## 自动化测试
 
 ```bash
 python -m pytest -q
 cd dashboard/frontend && npm run build
 ```
 
-## Limitations
+测试覆盖历史股票池、PIT 基本面可见性、连续调仓时间轴、价格生命周期、Market Regime 消融、策略实验室及前后端字段契约等关键路径。
 
-- This is a research system, not a trading system. There is no order-routing or brokerage integration.
-- Historical market and fundamental data depend on public/vendor sources and their coverage or revision behavior.
-- A point-in-time rule improves historical realism but cannot guarantee that every corporate action or vendor correction is perfectly reconstructed.
-- Backtest performance is sensitive to universe choice, data quality, cost assumptions, and model selection. It should not be interpreted as a forecast.
+## AI 辅助开发说明
+
+项目在迭代过程中使用 AI 辅助完成部分编码、测试与审计工作；研究问题、系统边界、数据真实性要求、策略约束和结果解释由开发者主导。仓库刻意保留审计与实验框架，避免把 AI 生成的输出直接包装成未经验证的投资结论。
+
+## 项目局限
+
+- 这是研究与模拟系统，不含下单、券商接口或实盘账户管理。
+- 历史行情和财务数据依赖公开/供应商数据，仍可能受到覆盖范围、修订数据和公司行动处理的影响。
+- PIT 规则能减少未来函数，但不能保证所有历史信息披露和公司行动均被完全重建。
+- 回测对股票池、成本假设、数据质量、因子选择和样本区间敏感，不能视为未来表现承诺。
 
 ## License
 
-No open-source license has been selected yet. Add an explicit license before treating the repository as reusable open-source software.
+目前尚未选择开源许可证；如需将本仓库作为可复用开源项目，请先补充明确的 License。
